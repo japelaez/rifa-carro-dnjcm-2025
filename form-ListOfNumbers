@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Google Sheet Table Auto-Sorted with Auto-Refresh</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #table-container {
+      width: 100%;
+      max-width: 1200px;
+      overflow-x: auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: auto; /* Adjust width based on content */
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center; /* Center the data */
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="table-container">Loading...</div>
+
+  <script>
+    const SPREADSHEET_ID = '1ocZSb15CfJ-AFPXZvcqUoDx6p8i6Yo_quvsFRGRXXYQ'; // Your sheet ID
+    const API_KEY = 'AIzaSyDY4U8VEBeUDHmsoLUSZX3t4hoH7xSlIQI'; // Your API key
+
+    async function loadSheetData() {
+      document.getElementById('table-container').textContent = 'Loading...';
+      try {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?includeGridData=true&ranges=Sheet1&key=${API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const sheet = data.sheets[0];
+        const rows = sheet.data[0].rowData;
+        const table = document.createElement('table');
+
+        rows.forEach((row, rowIndex) => {
+          const tr = document.createElement('tr');
+          (row.values || []).forEach(cell => {
+            const tag = rowIndex === 0 ? 'th' : 'td';
+            const el = document.createElement(tag);
+            el.textContent = cell.formattedValue || '';
+
+            // Apply background color
+            if (cell.effectiveFormat?.backgroundColor) {
+              const bg = cell.effectiveFormat.backgroundColor;
+              el.style.backgroundColor = `rgb(${(bg.red||0)*255}, ${(bg.green||0)*255}, ${(bg.blue||0)*255})`;
+            }
+
+            // Apply text color
+            if (cell.effectiveFormat?.textFormat?.foregroundColor) {
+              const fg = cell.effectiveFormat.textFormat.foregroundColor;
+              el.style.color = `rgb(${(fg.red||0)*255}, ${(fg.green||0)*255}, ${(fg.blue||0)*255})`;
+            }
+
+            // Bold and italic
+            if (cell.effectiveFormat?.textFormat?.bold) el.style.fontWeight = 'bold';
+            if (cell.effectiveFormat?.textFormat?.italic) el.style.fontStyle = 'italic';
+
+            // Strikethrough
+            if (cell.effectiveFormat?.textFormat?.strikethrough) el.style.textDecoration = 'line-through';
+
+            tr.appendChild(el);
+          });
+          table.appendChild(tr);
+        });
+
+        // Sort rows automatically (skip header)
+        const header = table.querySelector('tr');
+        const dataRows = Array.from(table.querySelectorAll('tr')).slice(1);
+        dataRows.sort((a, b) => {
+          const valA = a.cells[0].textContent.trim();
+          const valB = b.cells[0].textContent.trim();
+          const numA = parseFloat(valA) || valA.toLowerCase();
+          const numB = parseFloat(valB) || valB.toLowerCase();
+          return numA > numB ? 1 : numA < numB ? -1 : 0;
+        });
+        table.innerHTML = '';
+        table.appendChild(header);
+        dataRows.forEach(row => table.appendChild(row));
+
+        const container = document.getElementById('table-container');
+        container.innerHTML = '';
+        container.appendChild(table);
+      } catch (error) {
+        document.getElementById('table-container').textContent = 'Error: ' + error;
+      }
+    }
+
+    // Initial load
+    loadSheetData();
+
+    // Auto-refresh every 30 seconds
+    setInterval(() => {
+      loadSheetData();
+    }, 30000);
+  </script>
+</body>
+</html>
